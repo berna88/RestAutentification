@@ -1,32 +1,29 @@
 package com.consistent.autentification.application;
 
-import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.util.Collections;
 import java.util.Set;
 
 import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
 import javax.ws.rs.ApplicationPath;
 import javax.ws.rs.GET;
-import javax.ws.rs.NotAuthorizedException;
 import javax.ws.rs.Path;
 import javax.ws.rs.PathParam;
 import javax.ws.rs.Produces;
 import javax.ws.rs.QueryParam;
-import javax.ws.rs.container.ContainerRequestContext;
-import javax.ws.rs.container.ContainerRequestFilter;
 import javax.ws.rs.core.Application;
+import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
 
 import org.osgi.service.component.annotations.Component;
 
+import com.consistent.autentification.segurity.Autentification;
+import com.consistent.autentification.segurity.AutentificationImp;
 import com.liferay.portal.kernel.exception.PortalException;
 import com.liferay.portal.kernel.log.Log;
 import com.liferay.portal.kernel.log.LogFactoryUtil;
 import com.liferay.portal.kernel.model.User;
 import com.liferay.portal.kernel.security.auth.CompanyThreadLocal;
-import com.liferay.portal.kernel.security.auto.login.AutoLogin;
-import com.liferay.portal.kernel.security.auto.login.AutoLoginException;
 import com.liferay.portal.kernel.service.UserLocalServiceUtil;
 
 
@@ -34,8 +31,9 @@ import com.liferay.portal.kernel.service.UserLocalServiceUtil;
  * @author liferay
  */
 @ApplicationPath("/greetings")
+
 @Component(immediate = true, service = Application.class)
-public class ServiceAutentificationApplication extends Application implements ContainerRequestFilter,AutoLogin {
+public class ServiceAutentificationApplication extends Application{
 	
 	private static final Log log = LogFactoryUtil.getLog(ServiceAutentificationApplication.class);
 
@@ -52,8 +50,12 @@ public class ServiceAutentificationApplication extends Application implements Co
 	@GET
 	@Path("/morning")
 	@Produces("text/plain")
-	public String hello() {
+	public String hello(@Context HttpServletRequest request, 
+			@Context HttpHeaders headers) throws UnsupportedEncodingException, PortalException {
+		Autentification autentification = new AutentificationImp(request, headers);
+		log.info(autentification.isAutentificationBasic());
 		return "Good morning!";
+		
 	}
 
 	@GET
@@ -77,62 +79,52 @@ public class ServiceAutentificationApplication extends Application implements Co
 
 		return greeting;
 	}
-
-	@Override
-	public void filter(ContainerRequestContext requestContext) throws IOException {
+/*	
+	
+	public Response getValidate(
+			@Context HttpServletRequest request, 
+			@Context HttpHeaders headers){
 		
-				String authorizationHeader = requestContext.getHeaderString(HttpHeaders.AUTHORIZATION);
-				
-				log.info(authorizationHeader);
-				
-				if(authorizationHeader == null || !authorizationHeader.startsWith("Basic")){
-					throw new NotAuthorizedException("Debe tener tu autorizacion");
-				}
-				
-				String token = authorizationHeader.substring("Basic".length()).trim();
-				log.info(token);
-				requestContext.getRequest();
-				String userId = requestContext.getUriInfo().getPathParameters().getFirst("id");
-				log.info(userId);
-				Long companyId = CompanyThreadLocal.getCompanyId();
-				
-				try {
-					User user = UserLocalServiceUtil.getUserByEmailAddress(companyId, "test@liferay.com");
-					log.info("isPasswordEncrypted"+user.isPasswordEncrypted());
-					log.info("isActive"+user.isActive());
-					log.info("login"+user.getLogin());
-					log.info("isLockout"+user.isLockout());
-					log.info(user.getPasswordUnencrypted());
-				} catch (PortalException e) {
-					// TODO Auto-generated catch block
-					e.printStackTrace();
-				}
-				
-				
-				
+	try {
+		String token = Optional.ofNullable(headers.getRequestHeader(HttpHeaders.AUTHORIZATION)).orElse(Collections.<String> emptyList()).stream().collect(Collectors.joining(": "));
+		 if (token == null || !token.startsWith("Basic")) {
+		        return Response.status(Response.Status.UNAUTHORIZED).entity("La autenticación no es soportada").build();
+		    }
+		 log.info("token: "+token);
+		 
+		 String[] tokens = (new String(Base64.getDecoder().decode(token.split(" ")[1]), "UTF-8")).split(":");
+		 
+		 log.info(tokens);
+		 
+		 if (tokens == null) {
+			 log.info(Response.status(Response.Status.UNAUTHORIZED).entity("El mecanismo de autenticación ha fallado").build());
+		       return Response.status(Response.Status.UNAUTHORIZED).entity("El mecanismo de autenticación ha fallado").build();
+		 }
+		 log.info(tokens[0]);
+		 log.info(UserLocalServiceUtil.getUserByEmailAddress(PortalUtil.getCompanyId(request), tokens[0]).getAddresses());
+		 User user = UserLocalServiceUtil.getUserByEmailAddress(PortalUtil.getCompanyId(request), tokens[0]);
+		 
+		 log.info("user: "+user.getEmailAddress());
+		 
+		 boolean validUser = PasswordTrackerLocalServiceUtil.isSameAsCurrentPassword(user.getUserId(), tokens[1]);
+		 log.info("validUser: "+validUser);
+		 if(validUser){
+			 return Response.ok(MediaType.APPLICATION_JSON).build();
+		 }else{
+			 return Response.status(401).build();
+		 }
+		 
+	} catch (Exception e) {
+		// TODO: handle exception
+	}
+		
+				return null;
+		
 	}
 
-	@Override
-	public String[] handleException(HttpServletRequest request, HttpServletResponse response, Exception e)
-			throws AutoLoginException {
-		// TODO Auto-generated method stub
-		return null;
-	}
 
-	@Override
-	public String[] login(HttpServletRequest request, HttpServletResponse response) throws AutoLoginException {
-		try {
-			Long companyId = CompanyThreadLocal.getCompanyId();
-			User user = UserLocalServiceUtil.getUserByEmailAddress(companyId, "test@liferay");
-			System.out.println(user);
-			log.info(new String[]{String.valueOf(user.getUserId()), user.getPassword(), String.valueOf(user.isPasswordEncrypted()) });
-			return new String[]{String.valueOf(user.getUserId()), user.getPassword(), String.valueOf(user.isPasswordEncrypted()) };
-			} catch (PortalException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-			return null;
-			}
-	}
+*/
+	
 	
 	
 
