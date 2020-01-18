@@ -14,6 +14,7 @@ import javax.ws.rs.QueryParam;
 import javax.ws.rs.core.Application;
 import javax.ws.rs.core.Context;
 import javax.ws.rs.core.HttpHeaders;
+import javax.ws.rs.core.Response;
 
 import org.osgi.service.component.annotations.Component;
 
@@ -52,9 +53,17 @@ public class ServiceAutentificationApplication extends Application{
 	@Produces("text/plain")
 	public String hello(@Context HttpServletRequest request, 
 			@Context HttpHeaders headers) throws UnsupportedEncodingException, PortalException {
+		String status = "";
 		Autentification autentification = new AutentificationImp(request, headers);
-		log.info(autentification.isAutentificationBasic());
-		return "Good morning!";
+		if(autentification.isAutentificationBasic()){
+			log.info("paso");
+			status = "paso";
+		}else {
+			log.error("Problema con las credenciales del usuario");
+			status = String.valueOf(Response.status(401).build().getStatus());
+		}
+		
+		return status;
 		
 	}
 
